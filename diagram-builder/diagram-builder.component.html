@@ -1,0 +1,675 @@
+<div class="container-full">
+  <div class="sidebar">
+    <h2>Elements</h2>
+    <div>
+      <div class="tool-item" draggable="true" (dragstart)="onDragStart($event, 'component')">
+        <div class="tool-preview component"></div>
+        <span>Component</span>
+      </div>
+      <div class="tool-item" draggable="true" (dragstart)="onDragStart($event, 'subcomponent')">
+        <div class="tool-preview subcomponent"></div>
+        <span>Sub-component</span>
+      </div>
+      <div class="tool-item" draggable="true" (dragstart)="onDragStart($event, 'port')">
+        <div class="tool-preview port"></div>
+        <span>Port</span>
+      </div>
+    </div>
+
+    <h2>Interface type</h2>
+    <div class="interface-types">
+      <button [class.active]="selectedInterfaceType === 'internal'" (click)="selectInterfaceType('internal')"
+        type="internal">
+        Internal
+      </button>
+      <button [class.active]="selectedInterfaceType === 'external'" (click)="selectInterfaceType('external')"
+        type="external">
+        External
+      </button>
+    </div>
+
+    <!-- Ajouter ce bouton après les boutons de types d'interface -->
+    <div class="toolbox-section">
+      <h3>Export</h3>
+      <div class="button-row">
+        <button mat-raised-button color="primary" (click)="exportDiagram()">
+          <mat-icon>photo_camera</mat-icon>
+          Export
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="diagram-area">
+    <div #diagramContainer class="diagram-container" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+    </div>
+  </div>
+
+
+  <div class="zoom-controls" *ngIf="showZoomControls">
+    <button mat-icon-button (click)="zoomOut()" matTooltip="Zoom Out">
+      <mat-icon>remove</mat-icon>
+    </button>
+    <span class="zoom-level">{{ (zoomLevel * 100).toFixed(0) }}%</span>
+    <button mat-icon-button (click)="zoomIn()" matTooltip="Zoom In">
+      <mat-icon>add</mat-icon>
+    </button>
+    <button mat-icon-button (click)="resetZoom()" matTooltip="Reset Zoom">
+      <mat-icon>aspect_ratio</mat-icon>
+    </button>
+  </div>
+
+  <!-- Component Form -->
+  <div *ngIf="showComponentForm" class="component-form-overlay">
+    <div class="component-form-container mat-elevation-z8">
+      <div mat-dialog-title>
+        <h4>{{ isEditMode ? 'Edit' : 'Add' }} Component</h4>
+      </div>
+
+      <form [formGroup]="componentForm" class="form" novalidate>
+        <div mat-dialog-content class="content">
+          <div class="row custom-row">
+            <div class="col-12 col-sm-12">
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Name *</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <input matInput formControlName="name" required>
+                <mat-error *ngIf="componentForm.get('name')?.hasError('required')" class="no-pad">
+                  Name is required
+                </mat-error>
+              </mat-form-field>
+
+              <!-- Description Field -->
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Description</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="description"></textarea>
+              </mat-form-field>
+
+              <div class="mat-form-row">
+                <mat-checkbox formControlName="availability" color="primary">Availability</mat-checkbox>
+                <mat-checkbox formControlName="confidentiality" color="primary">Confidentiality</mat-checkbox>
+                <mat-checkbox formControlName="integrity" color="primary">Integrity</mat-checkbox>
+              </div>
+
+
+              <!-- Images -->
+              <div class="image-section">
+                <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Images</mat-label>
+                <button mat-stroked-button color="primary" (click)="fileInput.click()">
+                  <mat-icon>upload</mat-icon>
+                  Upload Images
+                </button>
+                <input #fileInput type="file" hidden (change)="onImageSelect($event)" multiple accept="image/*">
+
+                <div class="image-list" *ngIf="imageFiles.length > 0">
+                  <mat-card *ngFor="let image of imageFiles; let i = index" [class.default-image]="image.default">
+                    <mat-card-content class="image-item">
+                      <img *ngIf="image.file" [src]="utilsService.getImage(image.file)" alt="Image"
+                        class="image-preview">
+                      <img *ngIf="image.preview" [src]="image.preview" alt="Image" class="image-preview">
+                      <span class="image-name">{{ image.file ? image.file.split('/').pop() :
+                        image.uploadFile?.name }}</span>
+
+                      <div class="image-actions">
+                        <button mat-button color="primary" (click)="setImageAsDefault(i)" [disabled]="image.default"
+                          class="btn-default">
+                          {{ image.default ? 'Default' : 'Set as Default' }}
+                        </button>
+                        <button mat-icon-button color="warn" (click)="removeImage(i)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </div>
+
+              <div class="parameters-section">
+                <div class="bottom-section">
+                  <h2 style="margin-top: 2px !important;">
+                    <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Parameters</mat-label>
+
+                    <button mat-raised-button color="accent" type="button" (click)="addParameter()" class="add-btn">
+                      <mat-icon>add</mat-icon> Add Parameter
+                    </button>
+                  </h2>
+                </div>
+                <div formArrayName="parameters" class="responsive-table">
+                  <!-- Table structure for Parameters -->
+                  <table>
+                    <!-- Table Header -->
+                    <thead>
+                      <tr>
+                        <th><mat-label>Name*</mat-label></th>
+                        <th><mat-label>Value</mat-label></th>
+                        <th><mat-label>Secret</mat-label></th>
+                        <th><mat-label>Type</mat-label></th>
+                        <th><mat-label></mat-label></th>
+                      </tr>
+                    </thead>
+
+                    <!-- Table Body where input rows are dynamically created -->
+                    <tbody>
+                      <tr *ngFor="let param of parametersFormArray.controls; let i = index" [formGroupName]="i">
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="name" placeholder="Parameter name" required>
+                            <mat-error *ngIf="param.get('name')?.hasError('required')">
+                              Name is required
+                            </mat-error>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="value" placeholder="Value">
+                          </mat-form-field>
+                        </td>
+                        <td class="checkbox-cell">
+                          <mat-checkbox formControlName="secret" color="primary"></mat-checkbox>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <mat-select formControlName="parameter_type" placeholder="Select type">
+                              <mat-option [value]="null">Select type</mat-option>
+                              <mat-option *ngFor="let type of parameterTypes" [value]="type.id">
+                                {{ type.name }}
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <button mat-icon-button color="warn" type="button" (click)="removeParameter(i)"
+                            aria-label="Remove parameter" class="remove-button">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Notes</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="notes"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <div mat-dialog-actions class="action">
+          <div class="button-container">
+            <button *ngIf="isEditMode" mat-raised-button color="warn" type="button"
+              (click)="deleteComponent()">Delete</button>
+            <button mat-raised-button type="button" (click)="cancelComponentForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="!componentForm.valid"
+              (click)="submitComponentForm()">
+              {{isEditMode ? 'Update' : 'Save'}}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- Correction pour le formulaire du sous-composant -->
+  <div *ngIf="showSubComponentForm" class="component-form-overlay">
+    <div class="component-form-container mat-elevation-z8">
+      <div mat-dialog-title>
+        <h4>{{ isSubComponentEditMode ? 'Edit' : 'Add' }} subcomponent</h4>
+      </div>
+
+      <form [formGroup]="subComponentForm" class="form" novalidate>
+        <div mat-dialog-content class="content">
+          <div class="row custom-row">
+            <div class="col-12 col-sm-12">
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Name *</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <input matInput formControlName="name" required>
+                <mat-error *ngIf="subComponentForm.get('name')?.hasError('required')" class="no-pad">
+                  Name is required
+                </mat-error>
+              </mat-form-field>
+
+              <!-- Description Field -->
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Description</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="description"></textarea>
+              </mat-form-field>
+
+              <div class="mat-form-row">
+                <mat-checkbox formControlName="availability" color="primary">Availability</mat-checkbox>
+                <mat-checkbox formControlName="confidentiality" color="primary">Confidentiality</mat-checkbox>
+                <mat-checkbox formControlName="integrity" color="primary">Integrity</mat-checkbox>
+              </div>
+
+              <!-- Images -->
+              <div class="image-section">
+                <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Images</mat-label>
+                <button mat-stroked-button color="primary" (click)="fileInput.click()">
+                  <mat-icon>upload</mat-icon>
+                  Upload Images
+                </button>
+                <input #fileInput type="file" hidden (change)="onImageSelect($event)" multiple accept="image/*">
+
+                <div class="image-list" *ngIf="imageFiles.length > 0">
+                  <mat-card *ngFor="let image of imageFiles; let i = index" [class.default-image]="image.default">
+                    <mat-card-content class="image-item">
+                      <img *ngIf="image.file" [src]="utilsService.getImage(image.file)" alt="Image"
+                        class="image-preview">
+                      <img *ngIf="image.preview" [src]="image.preview" alt="Image" class="image-preview">
+                      <span class="image-name">{{ image.file ? image.file.split('/').pop() : image.uploadFile?.name
+                        }}</span>
+
+                      <div class="image-actions">
+                        <button mat-button color="primary" (click)="setImageAsDefault(i)" [disabled]="image.default"
+                          class="btn-default">
+                          {{ image.default ? 'Default' : 'Set as Default' }}
+                        </button>
+                        <button mat-icon-button color="warn" (click)="removeImage(i)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </div> <!-- Ajout de la balise fermante pour image-section -->
+
+              <div class="parameters-section">
+                <div class="bottom-section">
+                  <h2 style="margin-top: 2px !important;">
+                    <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Parameters</mat-label>
+
+                    <button mat-raised-button color="accent" type="button" (click)="addSubComponentParameter()"
+                      class="add-btn">
+                      <mat-icon>add</mat-icon> Add Parameter
+                    </button>
+                  </h2>
+                </div>
+                <div formArrayName="parameters" class="responsive-table">
+                  <!-- Table structure for Parameters -->
+                  <table>
+                    <!-- Table Header -->
+                    <thead>
+                      <tr>
+                        <th><mat-label>Name*</mat-label></th>
+                        <th><mat-label>Value</mat-label></th>
+                        <th><mat-label>Secret</mat-label></th>
+                        <th><mat-label>Type</mat-label></th>
+                        <th><mat-label></mat-label></th>
+                      </tr>
+                    </thead>
+
+                    <!-- Table Body where input rows are dynamically created -->
+                    <tbody>
+                      <tr *ngFor="let param of subComponentParametersFormArray.controls; let i = index"
+                        [formGroupName]="i">
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="name" placeholder="Parameter name" required>
+                            <mat-error *ngIf="param.get('name')?.hasError('required')">
+                              Name is required
+                            </mat-error>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="value" placeholder="Value">
+                          </mat-form-field>
+                        </td>
+                        <td class="checkbox-cell">
+                          <mat-checkbox formControlName="secret" color="primary"></mat-checkbox>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <mat-select formControlName="parameter_type" placeholder="Select type">
+                              <mat-option [value]="null">Select type</mat-option>
+                              <mat-option *ngFor="let type of parameterTypes" [value]="type.id">
+                                {{ type.name }}
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <button mat-icon-button color="warn" type="button" (click)="removeSubComponentParameter(i)"
+                            aria-label="Remove parameter" class="remove-button">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Notes</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="notes"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <div mat-dialog-actions class="action">
+          <div class="button-container">
+            <button *ngIf="isSubComponentEditMode" mat-raised-button color="warn" type="button"
+              (click)="deleteSubComponent()">Delete</button>
+            <button mat-raised-button type="button" (click)="cancelSubComponentForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="!subComponentForm.valid"
+              (click)="submitSubComponentForm()">
+              {{isSubComponentEditMode ? 'Update' : 'Save'}}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Port Form -->
+  <div *ngIf="showPortForm" class="component-form-overlay">
+    <div class="component-form-container mat-elevation-z8">
+      <div mat-dialog-title>
+        <h4>{{ isPortEditMode ? 'Edit' : 'Add' }} Port</h4>
+      </div>
+
+      <form [formGroup]="portForm" class="form" novalidate>
+        <div mat-dialog-content class="content">
+          <div class="row custom-row">
+            <div class="col-12 col-sm-12">
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Name *</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <input matInput formControlName="name" required>
+                <mat-error *ngIf="portForm.get('name')?.hasError('required')" class="no-pad">
+                  Name is required
+                </mat-error>
+              </mat-form-field>
+
+              <!-- Description Field -->
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Description</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="description"></textarea>
+              </mat-form-field>
+
+              <div class="mat-form-row">
+                <mat-checkbox formControlName="availability" color="primary">Availability</mat-checkbox>
+                <mat-checkbox formControlName="confidentiality" color="primary">Confidentiality</mat-checkbox>
+                <mat-checkbox formControlName="integrity" color="primary">Integrity</mat-checkbox>
+              </div>
+
+              <!-- Images -->
+              <div class="image-section">
+                <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Images</mat-label>
+                <button mat-stroked-button color="primary" (click)="fileInput.click()">
+                  <mat-icon>upload</mat-icon>
+                  Upload Images
+                </button>
+                <input #fileInput type="file" hidden (change)="onImageSelect($event)" multiple accept="image/*">
+
+                <div class="image-list" *ngIf="imageFiles.length > 0">
+                  <mat-card *ngFor="let image of imageFiles; let i = index" [class.default-image]="image.default">
+                    <mat-card-content class="image-item">
+                      <img *ngIf="image.file" [src]="utilsService.getImage(image.file)" alt="Image"
+                        class="image-preview">
+                      <img *ngIf="image.preview" [src]="image.preview" alt="Image" class="image-preview">
+                      <span class="image-name">{{ image.file ? image.file.split('/').pop() : image.uploadFile?.name
+                        }}</span>
+
+                      <div class="image-actions">
+                        <button mat-button color="primary" (click)="setImageAsDefault(i)" [disabled]="image.default"
+                          class="btn-default">
+                          {{ image.default ? 'Default' : 'Set as Default' }}
+                        </button>
+                        <button mat-icon-button color="warn" (click)="removeImage(i)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </div>
+
+              <div class="parameters-section">
+                <div class="bottom-section">
+                  <h2 style="margin-top: 2px !important;">
+                    <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Parameters</mat-label>
+
+                    <button mat-raised-button color="accent" type="button" (click)="addPortParameter()" class="add-btn">
+                      <mat-icon>add</mat-icon> Add Parameter
+                    </button>
+                  </h2>
+                </div>
+                <div formArrayName="parameters" class="responsive-table">
+                  <!-- Table structure for Parameters -->
+                  <table>
+                    <!-- Table Header -->
+                    <thead>
+                      <tr>
+                        <th><mat-label>Name*</mat-label></th>
+                        <th><mat-label>Value</mat-label></th>
+                        <th><mat-label>Secret</mat-label></th>
+                        <th><mat-label>Type</mat-label></th>
+                        <th><mat-label></mat-label></th>
+                      </tr>
+                    </thead>
+
+                    <!-- Table Body where input rows are dynamically created -->
+                    <tbody>
+                      <tr *ngFor="let param of portParametersFormArray.controls; let i = index" [formGroupName]="i">
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="name" placeholder="Parameter name" required>
+                            <mat-error *ngIf="param.get('name')?.hasError('required')">
+                              Name is required
+                            </mat-error>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="value" placeholder="Value">
+                          </mat-form-field>
+                        </td>
+                        <td class="checkbox-cell">
+                          <mat-checkbox formControlName="secret" color="primary"></mat-checkbox>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <mat-select formControlName="parameter_type" placeholder="Select type">
+                              <mat-option [value]="null">Select type</mat-option>
+                              <mat-option *ngFor="let type of parameterTypes" [value]="type.id">
+                                {{ type.name }}
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <button mat-icon-button color="warn" type="button" (click)="removePortParameter(i)"
+                            aria-label="Remove parameter" class="remove-button">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Notes</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="notes"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <div mat-dialog-actions class="action">
+          <div class="button-container">
+            <button *ngIf="isPortEditMode" mat-raised-button color="warn" type="button"
+              (click)="deletePort()">Delete</button>
+            <button mat-raised-button type="button" (click)="cancelPortForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="!portForm.valid"
+              (click)="submitPortForm()">
+              {{isPortEditMode ? 'Update' : 'Save'}}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <!-- Interface Form -->
+  <!-- Interface Form -->
+  <div *ngIf="showInterfaceForm" class="component-form-overlay">
+    <div class="component-form-container mat-elevation-z8">
+      <div mat-dialog-title>
+        <h4>{{ isInterfaceEditMode ? 'Edit' : 'Add' }} Interface</h4>
+      </div>
+
+      <form [formGroup]="interfaceForm" class="form" novalidate>
+        <div mat-dialog-content class="content">
+          <div class="row custom-row">
+            <div class="col-12 col-sm-12">
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Name *</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <input matInput formControlName="name" required>
+                <mat-error *ngIf="interfaceForm.get('name')?.hasError('required')" class="no-pad">
+                  Name is required
+                </mat-error>
+              </mat-form-field>
+
+              <!-- Description Field -->
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Description</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="description"></textarea>
+              </mat-form-field>
+
+              <div class="mat-form-row">
+                <mat-checkbox formControlName="availability" color="primary">Availability</mat-checkbox>
+                <mat-checkbox formControlName="confidentiality" color="primary">Confidentiality</mat-checkbox>
+                <mat-checkbox formControlName="integrity" color="primary">Integrity</mat-checkbox>
+              </div>
+
+              <!-- <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Type</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <mat-select formControlName="type">
+                  <mat-option value="internal">Internal</mat-option>
+                  <mat-option value="external">External</mat-option>
+                </mat-select>
+              </mat-form-field> -->
+
+              <!-- Images -->
+              <div class="image-section">
+                <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Images</mat-label>
+                <button mat-stroked-button color="primary" (click)="fileInput.click()">
+                  <mat-icon>upload</mat-icon>
+                  Upload Images
+                </button>
+                <input #fileInput type="file" hidden (change)="onImageSelect($event)" multiple accept="image/*">
+
+                <div class="image-list" *ngIf="imageFiles.length > 0">
+                  <mat-card *ngFor="let image of imageFiles; let i = index" [class.default-image]="image.default">
+                    <mat-card-content class="image-item">
+                      <img *ngIf="image.file" [src]="utilsService.getImage(image.file)" alt="Image"
+                        class="image-preview">
+                      <img *ngIf="image.preview" [src]="image.preview" alt="Image" class="image-preview">
+                      <span class="image-name">{{ image.file ? image.file.split('/').pop() : image.uploadFile?.name
+                        }}</span>
+
+                      <div class="image-actions">
+                        <button mat-button color="primary" (click)="setImageAsDefault(i)" [disabled]="image.default"
+                          class="btn-default">
+                          {{ image.default ? 'Default' : 'Set as Default' }}
+                        </button>
+                        <button mat-icon-button color="warn" (click)="removeImage(i)">
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </mat-card-content>
+                  </mat-card>
+                </div>
+              </div>
+
+              <div class="parameters-section">
+                <div class="bottom-section">
+                  <h2 style="margin-top: 2px !important;">
+                    <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Parameters</mat-label>
+
+                    <button mat-raised-button color="accent" type="button" (click)="addInterfaceParameter()"
+                      class="add-btn">
+                      <mat-icon>add</mat-icon> Add Parameter
+                    </button>
+                  </h2>
+                </div>
+                <div formArrayName="parameters" class="responsive-table">
+                  <!-- Table structure for Parameters -->
+                  <table>
+                    <!-- Table Header -->
+                    <thead>
+                      <tr>
+                        <th><mat-label>Name*</mat-label></th>
+                        <th><mat-label>Value</mat-label></th>
+                        <th><mat-label>Secret</mat-label></th>
+                        <th><mat-label>Type</mat-label></th>
+                        <th><mat-label></mat-label></th>
+                      </tr>
+                    </thead>
+
+                    <!-- Table Body where input rows are dynamically created -->
+                    <tbody>
+                      <tr *ngFor="let param of interfaceParametersFormArray.controls; let i = index"
+                        [formGroupName]="i">
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="name" placeholder="Parameter name" required>
+                            <mat-error *ngIf="param.get('name')?.hasError('required')">
+                              Name is required
+                            </mat-error>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <input matInput formControlName="value" placeholder="Value">
+                          </mat-form-field>
+                        </td>
+                        <td class="checkbox-cell">
+                          <mat-checkbox formControlName="secret" color="primary"></mat-checkbox>
+                        </td>
+                        <td>
+                          <mat-form-field appearance="outline" class="param-input">
+                            <mat-select formControlName="parameter_type" placeholder="Select type">
+                              <mat-option [value]="null">Select type</mat-option>
+                              <mat-option *ngFor="let type of parameterTypes" [value]="type.id">
+                                {{ type.name }}
+                              </mat-option>
+                            </mat-select>
+                          </mat-form-field>
+                        </td>
+                        <td>
+                          <button mat-icon-button color="warn" type="button" (click)="removeInterfaceParameter(i)"
+                            aria-label="Remove parameter" class="remove-button">
+                            <mat-icon>delete</mat-icon>
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <mat-label class="mat-subtitle-2 f-s-14 f-w-600 m-b-12 d-block">Notes</mat-label>
+              <mat-form-field appearance="outline" class="w-100" color="primary">
+                <textarea matInput formControlName="notes"></textarea>
+              </mat-form-field>
+            </div>
+          </div>
+        </div>
+
+        <div mat-dialog-actions class="action">
+          <div class="button-container">
+            <button *ngIf="isInterfaceEditMode" mat-raised-button color="warn" type="button"
+              (click)="deleteInterface()">Delete</button>
+            <button mat-raised-button type="button" (click)="cancelInterfaceForm()">Cancel</button>
+            <button mat-raised-button color="primary" type="submit" [disabled]="!interfaceForm.valid"
+              (click)="submitInterfaceForm()">
+              {{isInterfaceEditMode ? 'Update' : 'Save'}}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
